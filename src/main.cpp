@@ -10,10 +10,16 @@
 #define button A5
 #define lights A1
 
+#define shootsound 1
+#define tick 2
+#define shutdown 3
+#define startup 4
+
 bool prevA = false;
 bool prefs = false;
+bool shutoff = true;
 bool discnext = true;
-unsigned long shootDelay = 3000;
+unsigned long shootDelay = 4000;
 unsigned long prevShot = 0;
 uint8_t count = 137;
 
@@ -50,36 +56,74 @@ void setup() {
   pinMode(button, INPUT);
   pinMode(lights, OUTPUT);
 
+  // reset display
+  display.setBrightness(0x0f);
+  uint8_t c[4] = {0};
+  display.setSegments(c);
+
   mySerial.begin(9600);
   myMP3.begin(mySerial);
   myMP3.volume(20);
   delay(20);
-  myMP3.wakeUp();
-  delay(20);
-
-  display.setBrightness(0x0f);
-  display.showNumberDec(count, true);
-  uint8_t c[1] = {worlds[0]};
-  display.setSegments(c, 1, 0);
 }
 
 void loop() {
   bool shoot = !digitalRead(button);
   unsigned long t = millis();
+  if (shutoff) {
+    if (shoot && t - shootDelay >= prevShot) {
+      prevShot = t;
+      while (!digitalRead(button)) {
+        if (millis() - 1000 >= prevShot) {
+          myMP3.play(startup);
+          shutoff = false;
+          delay(400);
+          uint8_t c[1] = {worlds[0]};
+          display.showNumberDec(count, true);
+          display.setSegments(c, 1, 0);
+          digitalWrite(lights, HIGH);
+          delay(50);
+          digitalWrite(lights, LOW);
+          delay(100);
+          digitalWrite(lights, HIGH);
+          delay(50);
+          digitalWrite(lights, LOW);
+          delay(500);
+          break;
+        }
+      }
+    }
+    return;
+  }
+
   if (shoot && t - shootDelay >= prevShot) {
-    myMP3.playNext();
+    prevShot = t;
+    while (!digitalRead(button)) {
+      if (millis() - 1000 >= prevShot) {
+        myMP3.play(shutdown);
+        shutoff = true;
+        delay(400);
+        uint8_t c[4] = {0};
+        display.setSegments(c);
+        digitalWrite(lights, HIGH);
+        delay(50);
+        digitalWrite(lights, LOW);
+        delay(800);
+        return;
+      }
+    }
     digitalWrite(lights, HIGH);
+    myMP3.play(shootsound);
     delay(2000);
     digitalWrite(lights, LOW);
-    prevShot = t;
   }
 
   bool currA = digitalRead(outputA);
   delay(1);
   if (currA != prevA) {
-    prevA = currA;
     if (discnext) {
       discnext = false;
+      prevA = currA;
       return;
     }
     discnext = true;
@@ -95,6 +139,10 @@ void loop() {
     } else {
       world[0] = worlds[random(18)];
     }
+    prevA = currA;
+    myMP3.play(tick);
+    delay(40);
+    myMP3.play(tick);
     display.showNumberDec(count, true);
     display.setSegments(world, 1, 0);
   }
