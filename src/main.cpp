@@ -9,18 +9,24 @@
 #define outputB 6
 #define button A5
 #define lights A1
+#define toplight 9
 
 #define shootsound 1
 #define tick 2
 #define shutdown 3
 #define startup 4
+#define fadedelay 13
+#define fademin 160
 
 bool prevA = false;
 bool prefs = false;
 bool shutoff = true;
 bool discnext = true;
-unsigned long shootDelay = 4000;
+uint8_t fade = fademin;
+bool fadeup = true;
+const unsigned long shootDelay = 4000;
 unsigned long prevShot = 0;
+unsigned long prevFade = 0;
 uint8_t count = 137;
 
 // AbCdEFGHILJSoPunytr
@@ -55,6 +61,7 @@ void setup() {
   pinMode(outputB, INPUT);
   pinMode(button, INPUT);
   pinMode(lights, OUTPUT);
+  pinMode(toplight, OUTPUT);
 
   // reset display
   display.setBrightness(0x0f);
@@ -86,6 +93,7 @@ void loop() {
           digitalWrite(lights, LOW);
           delay(100);
           digitalWrite(lights, HIGH);
+          analogWrite(toplight, fade);
           delay(50);
           digitalWrite(lights, LOW);
           delay(500);
@@ -95,6 +103,8 @@ void loop() {
     }
     return;
   }
+
+  dofade(t);
 
   if (shoot && t - shootDelay >= prevShot) {
     prevShot = t;
@@ -108,10 +118,13 @@ void loop() {
         digitalWrite(lights, HIGH);
         delay(50);
         digitalWrite(lights, LOW);
+        digitalWrite(toplight, LOW);
         delay(800);
         return;
       }
     }
+    fade = 255;
+    analogWrite(toplight, fade);
     digitalWrite(lights, HIGH);
     myMP3.play(shootsound);
     delay(2000);
@@ -146,4 +159,23 @@ void loop() {
     display.showNumberDec(count, true);
     display.setSegments(world, 1, 0);
   }
+}
+
+void dofade(unsigned long t) {
+  if (t - fadedelay >= prevFade) {
+    if (fadeup) {
+      fade++;
+      if (fade == 255)
+        fadeup = false;
+      analogWrite(toplight, fade);
+    } else {
+      fade--;
+      if (fade == fademin)
+        fadeup = true;
+      analogWrite(toplight, fade);
+    }
+    prevFade = t;
+  }
+  if (random(500) == 21)
+    digitalWrite(toplight, LOW);
 }
